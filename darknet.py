@@ -3,71 +3,71 @@ import torch.nn as nn
 
 from layer import *
 
-class LayerOne(BasicLayer):
-    def __init__(self):
-        super().__init__((64, 32, 1, 1, 0),
-                         (32, 64, 3, 1, 1), 1)
+# class LayerOne(BasicLayer):
+#     def __init__(self):
+#         super().__init__((64, 32, 1, 1, 0),
+#                          (32, 64, 3, 1, 1), 1)
 
 
-class LayerTwo(BasicLayer):
-    def __init__(self):
-        super().__init__((128, 64, 1, 1, 0),
-                         (64, 128, 3, 1, 1), 2)
+# class LayerTwo(BasicLayer):
+#     def __init__(self):
+#         super().__init__((128, 64, 1, 1, 0),
+#                          (64, 128, 3, 1, 1), 2)
 
 
-class LayerThree(BasicLayer):
-    def __init__(self):
-        super().__init__((256, 128, 1, 1, 0),
-                         (128, 256, 3, 1, 1), 8)
+# class LayerThree(BasicLayer):
+#     def __init__(self):
+#         super().__init__((256, 128, 1, 1, 0),
+#                          (128, 256, 3, 1, 1), 8)
 
 
-class LayerFour(BasicLayer):
-    def __init__(self):
-        super().__init__((512, 256, 1, 1, 0),
-                         (256, 512, 3, 1, 1), 8)
+# class LayerFour(BasicLayer):
+#     def __init__(self):
+#         super().__init__((512, 256, 1, 1, 0),
+#                          (256, 512, 3, 1, 1), 8)
 
 
-class LayerFive(BasicLayer):
-    def __init__(self):
-        super().__init__((1024, 512, 1, 1, 0),
-                         (512, 1024, 3, 1, 1), 4)
+# class LayerFive(BasicLayer):
+#     def __init__(self):
+#         super().__init__((1024, 512, 1, 1, 0),
+#                          (512, 1024, 3, 1, 1), 4)
 
 
-class FirstPred(BasicPred):
-    def __init__(self,
-                 structs,
-                 use_cuda,
-                 route_index=4,
-                 anchors=[(116, 90), (156, 198), (373, 326)]):
-        super().__init__(structs, use_cuda, anchors, route_index=route_index)
+# class FirstPred(BasicPred):
+#     def __init__(self,
+#                  structs,
+#                  use_cuda,
+#                  route_index=4,
+#                  anchors=[(116, 90), (156, 198), (373, 326)]):
+#         super().__init__(structs, use_cuda, anchors, route_index=route_index)
 
 
-class SecondPred(BasicPred):
-    def __init__(self,
-                 structs,
-                 use_cuda,
-                 route_index=4,
-                 anchors=[(30, 61), (62, 45), (59, 119)]):
-        super().__init__(structs, use_cuda, anchors, route_index=route_index)
+# class SecondPred(BasicPred):
+#     def __init__(self,
+#                  structs,
+#                  use_cuda,
+#                  route_index=4,
+#                  anchors=[(30, 61), (62, 45), (59, 119)]):
+#         super().__init__(structs, use_cuda, anchors, route_index=route_index)
 
 
-class ThirdPred(BasicPred):
-    def __init__(self,
-                 structs,
-                 use_cuda,
-                 classes=80,
-                 height=416,
-                 anchors=[(10, 13), (16, 30), (33, 23)]):
-        super().__init__(structs, use_cuda, anchors)
+# class ThirdPred(BasicPred):
+#     def __init__(self,
+#                  structs,
+#                  use_cuda,
+#                  classes=80,
+#                  height=416,
+#                  anchors=[(10, 13), (16, 30), (33, 23)]):
+#         super().__init__(structs, use_cuda, anchors)
 
 
 class DarkNet(nn.Module):
     def __init__(self, num_classes, use_cuda):
         super().__init__()
-
+        height = 416
         self.num_classes = num_classes
         DETECT_DICT = {
-            #         indim, BasicConv(out_dim, kr_size, stride, padding)                      # route layer
+            # indim, BasicConv(out_dim, kr_size, stride, padding)                      # route layer
             'first':  [ 1024, 
                        ( 512, 1, 1, 0), 
                        (1024, 3, 1, 1), 
@@ -75,7 +75,7 @@ class DarkNet(nn.Module):
                        (1024, 3, 1, 1), 
                        ( 512, 1, 1, 0), 
                        (1024, 3, 1, 1), 
-                       ( 255, 1, 1, 0, 0)],
+                       ( 3*(5+num_classes), 1, 1, 0, 0)],
             'second': [  768,  
                        ( 256, 1, 1, 0), 
                        ( 512, 3, 1, 1), 
@@ -83,7 +83,7 @@ class DarkNet(nn.Module):
                        ( 512, 3, 1, 1), 
                        ( 256, 1, 1, 0), 
                        ( 512, 3, 1, 1), 
-                       ( 255, 1, 1, 0, 0)],
+                       ( 3*(5+num_classes), 1, 1, 0, 0)],
             'third':  [  384,  
                        ( 128, 1, 1, 0), 
                        ( 256, 3, 1, 1), 
@@ -91,43 +91,73 @@ class DarkNet(nn.Module):
                        ( 256, 3, 1, 1), 
                        ( 128, 1, 1, 0), 
                        ( 256, 3, 1, 1), 
-                       ( 255, 1, 1, 0, 0)],
+                       ( 3*(5+num_classes), 1, 1, 0, 0)],
         }
+        
+        ANCHORS_DICT = {
+            'first':  [(116, 90), (156, 198), (373, 326)],
+            'second': [(30, 61), (62, 45), (59, 119)],
+            'third':  [(10, 13), (16, 30), (33, 23)]
+        }
+
+
+
+        layer_1 = BasicLayer(( 64,  32, 1, 1, 0),
+                             ( 32,  64, 3, 1, 1), 1)
+        layer_2 = BasicLayer((128,  64, 1, 1, 0),
+                             ( 64, 128, 3, 1, 1), 2)
+        layer_3 = BasicLayer((256, 128, 1, 1, 0),
+                             (128, 256, 3, 1, 1), 8)
+
         self.seq_1 = nn.Sequential(
             BasicConv(3, 32, 3, 1, 1),
             BasicConv(32, 64, 3, 2, 1),
-            LayerOne(),
+            layer_1,
             BasicConv(64, 128, 3, 2, 1),
-            LayerTwo(),
+            layer_2,
             BasicConv(128, 256, 3, 2, 1),
-            LayerThree(),
+            layer_3
         )
-
+        
         self.conv_1 = BasicConv(256, 512, 3, 2, 1)
         
-        self.layer_4 = LayerFour()
+        self.layer_4 = BasicLayer((512, 256, 1, 1, 0),
+                                  (256, 512, 3, 1, 1), 8)
 
+        layer_5 = BasicLayer((1024,  512, 1, 1, 0),
+                             ( 512, 1024, 3, 1, 1), 4)
+
+        firstPred  = BasicPred(DETECT_DICT['first'], use_cuda, 
+                               anchors=ANCHORS_DICT['first'],
+                               classes=num_classes,
+                               height=height, route_index = 4)
         self.seq_2 = nn.Sequential(
             BasicConv(512, 1024, 3, 2, 1),
-            LayerFive(),
-            FirstPred(DETECT_DICT["first"], use_cuda)
+            layer_5,
+            firstPred
         )
 
         self.uns_1 = nn.Sequential(
             BasicConv(512, 256, 1, 1, 0),
             # nn.Upsample(scale_factor=2, mode="bilinear")
-            # nn.functional.interpolate(..., scale_factor=2, mode="bilinear")
             BasicInterpolate(scale_factor=2, mode='bilinear', align_corners=True)
         )
         self.uns_2 = nn.Sequential(
             BasicConv(256, 128, 1, 1, 0),
             # nn.Upsample(scale_factor=2, mode="bilinear")
-            # nn.functional.interpolate(..., scale_factor=2, mode="bilinear")
             BasicInterpolate(scale_factor=2, mode='bilinear', align_corners=True)
         )
 
-        self.pred_2 = SecondPred(DETECT_DICT["second"], use_cuda)
-        self.pred_3 = ThirdPred(DETECT_DICT["third"], use_cuda)
+        # self.pred_2 = SecondPred(DETECT_DICT["second"], use_cuda)
+        # self.pred_3 = ThirdPred(DETECT_DICT["third"], use_cuda)
+        self.pred_2 = BasicPred(DETECT_DICT['second'], use_cuda,
+                                anchors=ANCHORS_DICT['second'],
+                                classes=num_classes,
+                                height=height, route_index = 4)
+        self.pred_3 = BasicPred(DETECT_DICT['third'], use_cuda,
+                                anchors=ANCHORS_DICT['third'],
+                                classes=num_classes,
+                                height=height, route_index = 0)
 
     def forward(self, x):
         x = self.seq_1(x)
