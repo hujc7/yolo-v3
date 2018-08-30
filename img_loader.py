@@ -2,7 +2,7 @@ import os
 import random
 
 import torch
-from torch.autograd import Variable
+# from torch.autograd import Variable
 from torchvision import transforms as T
 
 from PIL import Image, ImageDraw, ImageFont
@@ -35,6 +35,7 @@ class IMGProcess(object):
         self._stop_step = self.sents_size // self.bsz
 
     def _encode(self, x):
+        # convert the image to network input size and a tensor
         encode = T.Compose([T.Resize((self.img_size, self.img_size)),
                             T.ToTensor()])
 
@@ -46,7 +47,7 @@ class IMGProcess(object):
 
         with torch.no_grad():
             tensors = [self._encode(img).unsqueeze(0) for img in imgs]
-            vs = Variable(torch.cat(tensors, 0))
+            vs = torch.cat(tensors, 0)
             if self.use_cuda:
                 vs = vs.cuda()
 
@@ -81,6 +82,7 @@ class IMGProcess(object):
                      self.confidence).float().unsqueeze(2)
         prediction = prediction * conf_mask
 
+        # create a tensor the same size as prediction
         box_corner = prediction.new(*prediction.size())
         box_corner[:, :, 0] = (prediction[:, :, 0] - prediction[:, :, 2] / 2)
         box_corner[:, :, 1] = (prediction[:, :, 1] - prediction[:, :, 3] / 2)
@@ -150,7 +152,11 @@ class IMGProcess(object):
         img = self.imgs[index]
         draw = ImageDraw.Draw(img)
 
-        tensor[:, :4] = tensor[:, :4].clamp_(0, self.img_size) * imgs_dim
+        # print(imgs_dim)
+        # print(tensor)
+        # if tensor.is_cuda():
+        #     tensor.to_cpu()
+        tensor[:, :4] = tensor.cpu()[:, :4].clamp_(0, self.img_size) * imgs_dim
         for t in tensor:
             s_x, s_y, e_x, e_y = list(map(int, t[:4]))
             label = self.classes[int(t[-1])]

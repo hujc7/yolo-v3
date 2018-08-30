@@ -36,6 +36,17 @@ class BasicLayer(nn.Module):
 
         return x
 
+class BasicInterpolate(nn.Module):
+    def __init__(self, size=None, scale_factor=None, mode='nearest', align_corners=None):
+        super().__init__()
+
+        self._size = size
+        self._scale_factor = scale_factor
+        self._mode = mode
+        self._align_corners = align_corners
+
+    def forward(self, x):
+        return nn.functional.interpolate(x, size=self._size, scale_factor=self._scale_factor, mode=self._mode, align_corners = self._align_corners)
 
 class BasicPred(nn.Module):
     def __init__(self,
@@ -44,7 +55,8 @@ class BasicPred(nn.Module):
                  anchors,
                  classes=80,
                  height=416,
-                 route_index=0):
+                 route_index=0 # the index of layer for output
+                 ):
         super().__init__()
 
         self.ri = route_index
@@ -59,7 +71,9 @@ class BasicPred(nn.Module):
             if len(s) == 4:
                 out_dim, kr_size, stride, padding = s
                 layer = BasicConv(in_dim, out_dim, kr_size, stride, padding)
-            else:
+            else: 
+                # fifth elemnt indicate not a BasicConv but Conv2d
+                # last layer for prediction is dimension reduction
                 out_dim, kr_size, stride, padding, _ = s
                 layer = nn.Conv2d(in_dim, out_dim, kr_size, stride, padding)
 
@@ -69,7 +83,7 @@ class BasicPred(nn.Module):
     def forward(self, x):
         for index, layer in enumerate(self.layers):
             x = layer(x)
-            if self.ri != 0 and index == self.ri:
+            if self.ri != 0 and index == self.ri: # return the output of ri layer as output
                 output = x
 
         detections = self.predict_transform(x.data)
@@ -82,11 +96,12 @@ class BasicPred(nn.Module):
     def predict_transform(self, prediction):
         """ borrowed from https://github.com/ayooshkathuria/YOLO_v3_tutorial_from_scratch/blob/master/util.py#L47
         """
+        # prediction = batch_size*num_channels*height*width
         batch_size = prediction.size(0)
-        stride = self.height // prediction.size(2)
-        grid_size = self.height // stride
-        bbox_attrs = 5 + self.classes
-        num_anchors = len(self.anchors)
+        stride = self.height // prediction.size(2) # 32, 16, 8: pixels per cell
+        grid_size = self.height // stride          # 13, 26, 52: number of cells
+        bbox_attrs = 5 + self.classes              # number of predictions per cell
+        num_anchors = len(self.anchors)            # number of anchors
 
         prediction = prediction.view(
             batch_size, bbox_attrs * num_anchors, grid_size * grid_size)
@@ -94,27 +109,32 @@ class BasicPred(nn.Module):
         prediction = prediction.view(
             batch_size, grid_size * grid_size * num_anchors, bbox_attrs)
 
-        anchors = [(a[0] / stride, a[1] / stride) for a in self.anchors]
+        anchors = [(a[0] / stride, a[1] / stride) for a in self.anchors] # normalized to [0, grid_size]
 
-        prediction[:, :, 0] = torch.sigmoid(prediction[:, :, 0])
-        prediction[:, :, 1] = torch.sigmoid(prediction[:, :, 1])
+        prediction[:, :, 0] = torch.sigmoid(prediction[:, :, 0]) # tx
+        prediction[:, :, 1] = torch.sigmoid(prediction[:, :, 1]) # ty
 
         grid = np.arange(grid_size)
         a, b = np.meshgrid(grid, grid)
 
-        x_offset = self.torch.FloatTensor(a).view(-1, 1)
-        y_offset = self.torch.FloatTensor(b).view(-1, 1)
+        x_offset = self.torch.FloatTensor(a).view(-1, 1) # column vector: grid_size * 1
+        y_offset = self.torch.FloatTensor(b).view(-1, 1) # column vector: grid_size * 1
 
-        x_y_offset = torch.cat((x_offset, y_offset), 1).repeat(
-            1, num_anchors).view(-1, 2).unsqueeze(0)
+        # grid_size * 2
+        # grid_size * (2*num_anchors)
+        # (grid_size*num_anchors) * 2
+        x_y_offset = torch.cat((x_offset, y_offset), 1) \
+                          .repeat(1, num_anchors) \
+                          .view(-1, 2) \
+                          .unsqueeze(0)
 
         prediction[:, :, :2] += x_y_offset
 
         anchors = self.torch.FloatTensor(anchors)
 
         anchors = anchors.repeat(grid_size * grid_size, 1).unsqueeze(0)
-        prediction[:, :, 2:4] = torch.exp(prediction[:, :, 2:4]) * anchors
-        prediction[:, :, :4] *= stride
+        prediction[:, :, 2:4] = torch.exp(prediction[:, :, 2:4]) * anchors # range [0, grid_size]
+        prediction[:, :, :4] *= stride # convert to original size 416*416
 
         # sigmoid Objectness and classes confidence
         prediction[:, :, 4:] = torch.sigmoid(prediction[:, :, 4:])

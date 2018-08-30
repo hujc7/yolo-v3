@@ -18,7 +18,7 @@ def main():
     args = parser.parse_args()
     use_cuda = torch.cuda.is_available() and not args.no_cuda
 
-    model = DarkNet(use_cuda)
+    model = DarkNet(80, use_cuda)
     model_source = torch.load(args.weights)
     model.load_state_dict(model_source['model'])
     model.eval()
