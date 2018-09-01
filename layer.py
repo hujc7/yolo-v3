@@ -95,6 +95,10 @@ class BasicPred(nn.Module):
 
     def predict_transform(self, prediction):
         """ borrowed from https://github.com/ayooshkathuria/YOLO_v3_tutorial_from_scratch/blob/master/util.py#L47
+            bx = sigmoid(tx) + cx
+            by = sigmoid(ty) + cy
+            bw = pw*exp(tw)
+            bh = ph*exp(th)
         """
         # prediction = batch_size*num_channels*height*width
         batch_size = prediction.size(0)
@@ -108,8 +112,10 @@ class BasicPred(nn.Module):
         prediction = prediction.transpose(1, 2).contiguous()
         prediction = prediction.view(
             batch_size, grid_size * grid_size * num_anchors, bbox_attrs)
+                       #concat dim
 
-        anchors = [(a[0] / stride, a[1] / stride) for a in self.anchors] # normalized to [0, grid_size]
+        # normalized to [0, grid_size]
+        anchors = [(a[0] / stride, a[1] / stride) for a in self.anchors] 
 
         prediction[:, :, 0] = torch.sigmoid(prediction[:, :, 0]) # tx
         prediction[:, :, 1] = torch.sigmoid(prediction[:, :, 1]) # ty
